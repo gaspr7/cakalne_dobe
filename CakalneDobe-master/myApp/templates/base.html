@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      {% block title %}
+        Django App
+      {% endblock %}
+    </title>
+   
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"  rel="stylesheet" />
+    
+    <style>
+      body {
+        background: linear-gradient(135deg, #00c6ff, #0072ff); 
+        background-attachment: fixed; 
+        color: white;
+      }
+
+      .container {
+        padding-top: 50px;
+        padding-bottom: 50px;
+      }
+
+      h1 {
+        font-weight: bold;
+        text-align: center;
+        font-size: 3rem;
+        color: #fff;
+      }
+
+      .card {
+        background-color: rgba(255, 255, 255, 0.8); 
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        margin-bottom: 20px;
+      }
+
+      .card-title {
+        font-size: 1.25rem;
+        color: #0072ff; 
+      }
+
+      .btn-primary {
+        background-color: #0072ff;
+        border: none;
+      }
+
+      .btn-primary:hover {
+        background-color: #005bb5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">{% block content %} {% endblock %}</div>
+  </body>
+</html>
