@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %} Home page {% endblock %}
+{% block content %}
+
+{% load static %}
+
+<div class="container" style="padding-top: 20px;">
+    <div class="row text-center">
+        <div class="col">
+            <h1 class="display-4" style="font-weight: bold; color: white;">
+                ČAKALNE DOBE V ZDRAVSTVU
+            </h1>
+        </div>
+    </div>
+
+    <div class="row justify-content-center" style="padding-bottom: 0; padding-top: 50px;">
+        <div class="col-lg-4 col-md-6 col-sm-12 mb-4">
+            <div class="card shadow-sm text-center h-100" style="box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.15); transition: transform 0.3s ease; background-color: #f4f9ff;">
+                <div class="card-body d-flex flex-column">
+                    <img src="{% static 'images/primerjava_2_storitev.png' %}" class="card-img-top mb-3" alt="Slika storitev" style="object-fit: cover; height: 200px;">
+                    <h5 class="card-title text-info">Prikaz čakalnih dob za izbrano storitev</h5>
+                    <a href="databasetest/" class="btn mt-auto">Primerjaj</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 col-sm-12 mb-4">
+            <div class="card shadow-sm text-center h-100" style="box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.15); transition: transform 0.3s ease; background-color: #f4f9ff;">
+                <div class="card-body d-flex flex-column">
+                    <img src="{% static 'images/tip_pregleda.jpg' %}" class="card-img-top mb-3" alt="Slika tipov pregleda" style="object-fit: cover; height: 200px;">
+                    <h5 class="card-title text-info">Primerjava po tipih pregleda</h5>
+                    <a href="/primerjava_tipov_pregleda" class="btn mt-auto">Primerjaj</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 col-sm-12 mb-4">
+            <div class="card shadow-sm text-center h-100" style="box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.15); transition: transform 0.3s ease; background-color: #f4f9ff;">
+                <div class="card-body d-flex flex-column">
+                    <img src="{% static 'images/hospital.jpg' %}" alt="Čakalne dobe" class="card-img-top mb-3" style="object-fit: cover; height: 200px;">
+                    <h5 class="card-title text-info">Primerjava po nazivih izvajalca</h5>
+                    <a href="/executors" class="btn mt-auto">Primerjaj</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="p-4 rounded shadow-lg bg-light mt-5">
+
+  <form id="data-form" class="input d-flex flex-wrap gap-3 align-items-center justify-content-center mb-5 mt-2">
+      
+      
+  </form>
+
+  <div class="chart-container d-flex justify-content-center align-items-center">
+      <canvas id="mySecondChart" style="width: 900; height: 500;"></canvas>
+  </div>
+
+ 
+
+</div>
+
+<style>
+
+  
+#myChart {
+    width: 100% !important;
+    height: 400px !important;
+}
+body {
+    overflow: auto;
+}
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn {
+    background-color: #0466cf;
+    border-color: #0466cf;
+    color: white;
+}
+
+.btn:hover {
+    background-color: white;
+    color: #0466cf;
+    border-width: 2px;
+}
+</style>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  $(document).ready(function () {
+      // Fetch chart data when the page loads
+      fetch("/zacetna-storitev-graf2/", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": "{{ csrf_token }}",
+          },
+      })
+          .then(response => response.json())
+          .then(data => {
+              if (!Array.isArray(data) || data.length === 0) {
+                  console.error("Ni podatkov za prikaz.");
+                  return;
+              }
+
+              const months = data.map(item => {
+                  const date = new Date(item.recorded_date);
+                  return date.toLocaleString('sl-SI', { month: 'long' }); // Pridobi samo mesec
+              });
+
+              const uniqueMonths = months.map((month, index, arr) => {
+                  return index === 0 || month !== arr[index - 1] ? month : "";
+              });
+
+              const Vsotaset = data.map(item => item.total_nad_dop_cd_vsota); // Vsote za Y os
+
+              const maxValue = Math.max(...Vsotaset);
+              const roundedMaxValue = Math.ceil(maxValue / 20000) * 20000;
+
+              const ctx2 = document.getElementById("mySecondChart").getContext("2d");
+
+              if (window.mySecondChart && typeof window.mySecondChart.destroy === "function") {
+                  window.mySecondChart.destroy();
+              }
+
+              window.mySecondChart = new Chart(ctx2, {
+                  type: "line",
+                  data: {
+                      labels: uniqueMonths, // Prikaži unikatne mesece na X osi
+                      datasets: [
+                          {
+                              label: "Število čakajočih nad dopustno čakalno dobo",
+                              data: Vsotaset, // Vsote na Y osi
+                              borderColor: "#007bff",
+                              backgroundColor: "rgba(0, 123, 255, 0.2)",
+                              borderWidth: 3,
+                              tension: 0.4,
+                              fill: true,
+                              pointRadius: 4,
+                              pointBackgroundColor: "#007bff",
+                              pointBorderWidth: 2,
+                          },
+                      ],
+                  },
+                  options: {
+                      responsive: true,
+                      plugins: {
+                          legend: {
+                              display: false,
+                          },
+                          title: {
+                              display: true,
+                              text: "Število čakajočih nad dopustno čakalno dobo",
+                              font: {
+                                  size: 24,
+                              },
+                              padding: {
+                                  bottom: 50,
+                              },
+                          },
+                          tooltip: {
+                              callbacks: {
+                                  label: function (tooltipItem) {
+                                      const item = data[tooltipItem.dataIndex];
+                                      const date = new Date(item.recorded_date);
+                                      const povprecnaCD = tooltipItem.raw;
+                                      const formattedDate = date.toLocaleDateString('sl-SI');
+
+                                      return `${tooltipItem.dataset.label}: ${povprecnaCD} dni, Datum: ${formattedDate}`;
+                                  },
+                              },
+                          },
+                      },
+                      scales: {
+                          x: {
+                              title: {
+                                  display: true,
+                                  text: "Mesec",
+                                  font: {
+                                      size: 18,
+                                  },
+                              },
+                              grid: {
+                                  display: true,
+                              },
+                          },
+                          y: {
+                              title: {
+                                  display: true,
+                                  text: "Št. čakajočih",
+                                  font: {
+                                      size: 18,
+                                  },
+                              },
+                              beginAtZero: true,
+                              grid: {
+                                  borderColor: "rgba(0, 0, 0, 0.1)",
+                              },
+                              suggestedMax: roundedMaxValue, // Nastavi največjo vrednost y-osi
+                          },
+                      },
+                      layout: {
+                          padding: {
+                              top: 20,
+                          },
+                      },
+                  },
+              });
+          })
+          .catch(error => console.error("Napaka pri pridobivanju podatkov:", error));
+  });
+</script>
+
+
+
+
+
+
+
+
+
+{% endblock %}

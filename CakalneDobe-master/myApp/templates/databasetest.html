@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}čakalneDobe{% endblock %}
+{% block content %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" />
+
+<div class="d-flex justify-content-between align-items-center my-5">
+  <div>
+      <a href="{% url 'home' %}" class="btn btn-primary">Nazaj</a>
+  </div>
+
+  <div class="d-flex justify-content-center align-items-center w-100">
+      <h1 style="text-transform: uppercase; font-size: 40px; font-weight: bold; color: white; text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);">
+          čakalna doba za izbrano storitev
+      </h1>
+  </div>
+</div>
+
+<div class="p-4 rounded shadow-lg bg-light">
+
+    <form id="data-form" class="input d-flex flex-wrap gap-3 align-items-center justify-content-center mb-5">
+        <div style="flex: 1; min-width: 200px; max-width: 400px; padding: 15px;">
+            <select name="vzs_naziv" id="vzs_naziv" class="vzs-naziv form-select" ></select>
+        </div>
+        <div>
+            <button type="submit" class="btn btn-outline-primary" style="margin-left: 20px; border-radius: 5px;" id="primerjaj-button">Prikaži</button>
+        </div>
+    </form>
+
+    <div class="chart-container d-flex justify-content-center align-items-center">
+        <canvas id="myChart" style="max-width: 900px; max-height: 400px; height: 230px;"></canvas>
+    </div>
+
+    <div class="chart-container d-flex justify-content-center align-items-center mt-5">
+        <canvas id="mySecondChart" style="max-width: 900px; max-height: 400px; height: 230px;"></canvas>
+    </div>
+
+    <div class="chart-container d-flex justify-content-center align-items-center mt-5">
+        <canvas id="myThirdChart" style="max-width: 900px; max-height: 400px; height: 230px;"></canvas>
+    </div>
+
+</div>
+
+
+</div>
+
+
+<style>
+    .btn {
+        background-color: #0466cf;
+        color: white;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    .btn:hover{
+        background-color: white;
+        color: #0466cf;
+        border-width: 2px;
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    $(document).ready(function () {
+       $("select.vzs-naziv").select2({
+            placeholder: "Izberi zdravstveno storitev...",
+            minimumInputLength: 0, 
+            ajax: {
+                url: "/search-vzs", 
+                dataType: "json",
+                delay: 250, 
+                data: function (params) {
+                    return { query: params.term }; 
+                },
+                processResults: function (data) {
+                    return {
+                        results: data.results.map(item => ({ id: item.vzs_naziv, text: item.vzs_naziv })),
+                    };
+                },
+            },
+        });
+
+        
+        document.getElementById("data-form").addEventListener("submit", function (e) {
+            e.preventDefault(); 
+            const selectedValue = document.getElementById("vzs_naziv").value;
+            
+            
+            fetch("/get-chart-data/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}",
+                },
+                body: JSON.stringify({ vzs_naziv: selectedValue }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById("myChart").getContext("2d");
+
+                if (window.myChart && typeof window.myChart.destroy === "function") {
+                    window.myChart.destroy();
+                }
+
+                window.myChart = new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: ["ZELO HITRO", "HITRO", "REDNO"],
+                        datasets: [
+                            {
+                                label: `ČD: ${selectedValue}`,
+                                data: [
+                                    data.povprecna_cd_zelo_h,
+                                    data.povprecna_cd_hitro,
+                                    data.povprecna_cd_redno,
+                                ],
+                                backgroundColor: "#007FFF",
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false,
+                            },
+                            title: {
+                                display: true,
+                                text: "POVPREČNA ČAKALNA DOBA ZA PRVI PROSTI TERMIN",
+                                font: {
+                                    size: 24,
+                                    
+                                },
+                                padding: {
+                                  bottom: 50,
+                                }
+                            },
+                            datalabels: {
+                                display: true,
+                                color: "black",
+                                font: {
+                                    size: 26,
+                                },
+                                anchor: "start", 
+                                align: "end",  
+                                formatter: function (value) {
+                                    return value; 
+                                },
+                            },
+                        },
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: "Čakalna doba (v dnevih)",
+
+                                },
+                            },
+                           
+                        },
+                    },
+                    plugins: [ChartDataLabels], 
+                });
+            })
+            .catch(error => console.error("Error fetching data:", error));
+
+            fetch("/get-ena-storitev-graf2/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-CSRFToken": "{{ csrf_token }}",
+  },
+  body: JSON.stringify({ vzs_naziv: selectedValue }),
+})
+.then(response => response.json())
+.then(data => {
+  let previousMonth = null;
+
+  const labels = data.map(item => {
+    const date = new Date(item.recorded_date);
+    const currentMonth = date.toLocaleString('sl-SI', { month: 'long' });
+
+    if (currentMonth !== previousMonth) {
+      previousMonth = currentMonth;
+      return currentMonth;
+    } else {
+      return ""; 
+    }
+  });
+
+  const zeloHitroDataset = data.map(item => item.povprecna_cd_zelo_h);
+  const hitroDataset = data.map(item => item.povprecna_cd_hitro);
+  const rednoDataset = data.map(item => item.povprecna_cd_redno);
+
+  const ctx2 = document.getElementById("mySecondChart").getContext("2d");
+
+  if (window.mySecondChart && typeof window.mySecondChart.destroy === "function") {
+    window.mySecondChart.destroy();
+  }
+
+  window.mySecondChart = new Chart(ctx2, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Zelo hitro",
+          data: zeloHitroDataset,
+          borderColor: "#FF5733",
+          backgroundColor: "rgba(255, 87, 51, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: "Hitro",
+          data: hitroDataset,
+          borderColor: "#33B5FF",
+          backgroundColor: "rgba(51, 181, 255, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: "Redno",
+          data: rednoDataset,
+          borderColor: "#8E44AD",
+          backgroundColor: "rgba(142, 68, 173, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "left",
+        },
+        title: {
+          display: true,
+          text: "",
+          font: {
+            size: 24,
+          },
+          padding: {
+            top: 10,
+            bottom: 50,
+            }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(tooltipItem) {
+              const item = data[tooltipItem.dataIndex];  
+              const date = new Date(item.recorded_date);  
+              const formattedDate = date.toLocaleDateString('sl-SI'); 
+
+              return `${tooltipItem.dataset.label}: ${povprecnaCD} dni, Datum: ${formattedDate}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Mesec",
+            
+          },
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Čakalna doba (v dnevih)",
+          },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+})
+.catch(error => console.error("Napaka pri pridobivanju podatkov:", error));
+
+
+fetch("/get-ena-storitev-graf3/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-CSRFToken": "{{ csrf_token }}",
+  },
+  body: JSON.stringify({ vzs_naziv: selectedValue }),
+})
+.then(response => response.json())
+.then(data => {
+  let previousMonth = null;
+
+  const labels = data.map(item => {
+    const date = new Date(item.recorded_date);
+    const currentMonth = date.toLocaleString('sl-SI', { month: 'long' });
+
+    if (currentMonth !== previousMonth) {
+      previousMonth = currentMonth;
+      return currentMonth;
+    } else {
+      return ""; 
+    }
+  });
+
+  const zeloHitroNadDataset = data.map(item => item.nad_dop_cd_zelo_h);
+  const hitroNadDataset = data.map(item => item.nad_dop_cd_hitro);
+  const rednoNadDataset = data.map(item => item.nad_dop_cd_redno);
+
+  const ctx3 = document.getElementById("myThirdChart").getContext("2d");
+
+  if (window.myThirdChart && typeof window.myThirdChart.destroy === "function") {
+    window.myThirdChart.destroy();
+  }
+
+  window.myThirdChart = new Chart(ctx3, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Zelo hitro",
+          data: zeloHitroNadDataset,
+          borderColor: "#FF5733",
+          backgroundColor: "rgba(255, 87, 51, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: "Hitro",
+          data: hitroNadDataset,
+          borderColor: "#33B5FF",
+          backgroundColor: "rgba(51, 181, 255, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+        {
+          label: "Redno",
+          data: rednoNadDataset,
+          borderColor: "#8E44AD",
+          backgroundColor: "rgba(142, 68, 173, 0.2)",
+          tension: 0.3,
+          fill: true,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "left",
+        },
+        title: {
+          display: true,
+          text: `ŠTEVILO ČAKAJOČIH NAD DOVOLJENO ČAKALNO DOBO (${selectedValue}) `,
+          font: {
+            size: 24,
+          },
+          padding: {
+            bottom: 50,
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(tooltipItem) {
+              const item = data[tooltipItem.dataIndex];  
+              const date = new Date(item.recorded_date);  
+              const nadDopCD = tooltipItem.raw; 
+              const formattedDate = date.toLocaleDateString('sl-SI'); 
+
+              return `${tooltipItem.dataset.label}: ${nadDopCD} čakajočih, Datum: ${formattedDate}`;
+            }
+            
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Mesec",
+            font: 18,
+          },
+        },
+        
+        y: {
+          title: {
+            display: true,
+            text: "Število čakajočih",
+          },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+})
+.catch(error => console.error("Napaka pri pridobivanju podatkov:", error));
+
+        });
+    });
+</script>
+
+{% endblock %}
